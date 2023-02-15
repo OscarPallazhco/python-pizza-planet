@@ -46,6 +46,24 @@ def test_create(app, ingredients, size, client_data):
         pytest.assume(not ingredients_in_detail.difference(ingredient_ids))
 
 
+def test_create__should_return_message_when_required_info_is_missing(app, ingredients, size, client_data):
+    created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
+    order = __order(created_ingredients, created_size, client_data)
+    del order["size_id"]
+    created_order, error = OrderController.create(order)
+    pytest.assume(created_order is None)
+    pytest.assume(error == 'Invalid order payload')
+
+
+def test_create__should_return_invalid_size_message_when_size_id_not_exists(app, ingredients, size, client_data):
+    created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
+    order = __order(created_ingredients, created_size, client_data)
+    order["size_id"] = order["size_id"] + 10
+    created_order, error = OrderController.create(order)
+    pytest.assume(created_order is None)
+    pytest.assume(error == 'Invalid size for Order')
+
+
 def test_calculate_order_price(app, ingredients, size, client_data):
     created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
     order = __order(created_ingredients, created_size, client_data)
