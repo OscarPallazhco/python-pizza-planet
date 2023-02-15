@@ -1,0 +1,37 @@
+name: Pizza planet CI
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  pizza-planet-ci:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: [3.8]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setting up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt
+      
+      - name: Start the database
+        run: |
+          python3 manage.py db init
+          python3 manage.py db migrate
+          python3 manage.py db upgrade
+      
+      - name: Run tests
+        run: |
+          pytest
+  
