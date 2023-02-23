@@ -1,16 +1,18 @@
 import pytest
 from app.controllers import (IngredientController, OrderController,
-                             SizeController)
+                             SizeController, BeverageController)
 from app.controllers.base import BaseController
 from app.test.utils.functions import get_random_choice, shuffle_list
 
 
-def __order(ingredients: list, size: dict, client_data: dict):
+def __order(ingredients: list, beverages: list, size: dict, client_data: dict):
     ingredients = [ingredient.get('_id') for ingredient in ingredients]
+    beverages = [beverage.get('_id') for beverage in beverages]
     size_id = size.get('_id')
     return {
         **client_data,
         'ingredients': ingredients,
+        'beverages': beverages,
         'size_id': size_id
     }
 
@@ -28,13 +30,19 @@ def __create_sizes_and_ingredients(ingredients: list, sizes: list):
     created_sizes = __create_items(sizes, SizeController)
     return created_sizes if len(created_sizes) > 1 else created_sizes.pop(), created_ingredients
 
+def __create_beverages(beverages: list):
+    created_beverages = __create_items(beverages, BeverageController)
+    return created_beverages
 
-def test_create(app, ingredients, size, client_data):
+
+def test_create(app, ingredients, beverages, size, client_data):
     created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
-    order = __order(created_ingredients, created_size, client_data)
+    created_beverages = __create_beverages(beverages)
+    order = __order(created_ingredients, created_beverages, created_size, client_data)
     created_order, error = OrderController.create(order)
     size_id = order.pop('size_id', None)
     ingredient_ids = order.pop('ingredients', [])
+    beverage_ids = order.pop('beverages', [])
     pytest.assume(error is None)
     for param, value in order.items():
         pytest.assume(param in created_order)
@@ -45,39 +53,78 @@ def test_create(app, ingredients, size, client_data):
         ingredients_in_detail = set(item['ingredient']['_id'] for item in created_order['detail'])
         pytest.assume(not ingredients_in_detail.difference(ingredient_ids))
 
+        beverages_in_order = set(item['beverage']['_id'] for item in created_order['beverage'])
+        pytest.assume(not beverages_in_order.difference(beverage_ids))
 
-def test_create__should_return_message_when_required_info_is_missing(app, ingredients, size, client_data):
+
+def test_create__without_beverages(app, ingredients, size, client_data):
     created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
-    order = __order(created_ingredients, created_size, client_data)
+    order = __order(created_ingredients, [], created_size, client_data)
+    created_order, error = OrderController.create(order)
+    size_id = order.pop('size_id', None)
+    ingredient_ids = order.pop('ingredients', [])
+    beverage_ids = order.pop('beverages', [])
+    pytest.assume(error is None)
+    for param, value in order.items():
+        pytest.assume(param in created_order)
+        pytest.assume(value == created_order[param])
+        pytest.assume(created_order['_id'])
+        pytest.assume(size_id == created_order['size']['_id'])
+
+        ingredients_in_detail = set(item['ingredient']['_id'] for item in created_order['detail'])
+        pytest.assume(not ingredients_in_detail.difference(ingredient_ids))
+
+        beverages_in_order = set(item['beverage']['_id'] for item in created_order['beverage'])
+        pytest.assume(not beverages_in_order.difference(beverage_ids))
+
+
+def test_create__should_return_message_when_required_info_is_missing(app, ingredients, beverages, size, client_data):
+    created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
+    created_beverages = __create_beverages(beverages)
+    order = __order(created_ingredients, created_beverages, created_size, client_data)
     del order["size_id"]
     created_order, error = OrderController.create(order)
     pytest.assume(created_order is None)
     pytest.assume(error == 'Invalid order payload')
 
 
-def test_create__should_return_invalid_size_message_when_size_id_not_exists(app, ingredients, size, client_data):
+def test_create__should_return_invalid_size_message_when_size_id_not_exists(app, ingredients, beverages, size, client_data):
     created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
-    order = __order(created_ingredients, created_size, client_data)
+    created_beverages = __create_beverages(beverages)
+    order = __order(created_ingredients, created_beverages, created_size, client_data)
     order["size_id"] = order["size_id"] + 10
     created_order, error = OrderController.create(order)
     pytest.assume(created_order is None)
     pytest.assume(error == 'Invalid size for Order')
 
 
-def test_calculate_order_price(app, ingredients, size, client_data):
+def test_calculate_order_price(app, ingredients, beverages, size, client_data):
     created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
-    order = __order(created_ingredients, created_size, client_data)
+    created_beverages = __create_beverages(beverages)
+    order = __order(created_ingredients, created_beverages, created_size, client_data)
     created_order, _ = OrderController.create(order)
-    pytest.assume(created_order['total_price'] == round(created_size['price'] + sum(ingredient['price'] for ingredient in created_ingredients), 2))
+    ingredients_total = sum(ingredient['price'] for ingredient in created_ingredients)
+    beverages_total = sum(beverage['price'] for beverage in created_beverages)
+    pytest.assume(created_order['total_price'] == round(created_size['price'] + ingredients_total + beverages_total, 2))
 
 
-def test_get_by_id(app, ingredients, size, client_data):
+def test_calculate_order_price__without_beverages(app, ingredients, size, client_data):
     created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
-    order = __order(created_ingredients, created_size, client_data)
+    order = __order(created_ingredients, [], created_size, client_data)
+    created_order, _ = OrderController.create(order)
+    ingredients_total = sum(ingredient['price'] for ingredient in created_ingredients)
+    pytest.assume(created_order['total_price'] == round(created_size['price'] + ingredients_total, 2))
+
+
+def test_get_by_id(app, ingredients, beverages, size, client_data):
+    created_size, created_ingredients = __create_sizes_and_ingredients(ingredients, [size])
+    created_beverages = __create_beverages(beverages)
+    order = __order(created_ingredients, created_beverages, created_size, client_data)
     created_order, _ = OrderController.create(order)
     order_from_db, error = OrderController.get_by_id(created_order['_id'])
     size_id = order.pop('size_id', None)
     ingredient_ids = order.pop('ingredients', [])
+    beverage_ids = order.pop('beverages', [])
     pytest.assume(error is None)
     for param, value in created_order.items():
         pytest.assume(order_from_db[param] == value)
@@ -86,12 +133,16 @@ def test_get_by_id(app, ingredients, size, client_data):
         ingredients_in_detail = set(item['ingredient']['_id'] for item in created_order['detail'])
         pytest.assume(not ingredients_in_detail.difference(ingredient_ids))
 
+        beverages_in_order = set(item['beverage']['_id'] for item in created_order['beverage'])
+        pytest.assume(not beverages_in_order.difference(beverage_ids))
 
-def test_get_all(app, ingredients, sizes, client_data):
+
+def test_get_all(app, ingredients, beverages, sizes, client_data):
     created_sizes, created_ingredients = __create_sizes_and_ingredients(ingredients, sizes)
+    created_beverages = __create_beverages(beverages)
     created_orders = []
     for _ in range(5):
-        order = __order(shuffle_list(created_ingredients)[:3], get_random_choice(created_sizes), client_data)
+        order = __order(shuffle_list(created_ingredients)[:3], shuffle_list(created_beverages)[:3], get_random_choice(created_sizes), client_data)
         created_order, _ = OrderController.create(order)
         created_orders.append(created_order)
 
