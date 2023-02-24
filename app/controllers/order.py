@@ -23,3 +23,11 @@ class OrderController(BaseController):
             return builder.create()
         except (SQLAlchemyError, RuntimeError) as ex:
             return None, str(ex)
+    
+
+    @classmethod
+    def update(cls, order: dict):
+        try:
+            return cls.manager.update(), None
+        except (SQLAlchemyError, RuntimeError) as ex:
+            return None, str(ex)
