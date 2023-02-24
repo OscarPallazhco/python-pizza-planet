@@ -1,4 +1,4 @@
-from app.common.http_methods import GET, POST
+from app.common.http_methods import GET, POST, PUT
 from flask import Blueprint, jsonify, request
 
 from ..controllers import OrderController
@@ -10,6 +10,11 @@ order = Blueprint('order', __name__)
 @order.route('/', methods=POST)
 def create_order():
     return create(OrderController, request)
+
+
+@order.route('/', methods=PUT)
+def update_order():
+    return update(OrderController, request)
 
 
 @order.route('/id/<_id>', methods=GET)

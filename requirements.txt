@@ -34,3 +34,4 @@ toml==0.10.2
 Werkzeug==2.0.2
 zipp==3.7.0
 pytest-mock==3.10.0
+coverage==7.2.0
