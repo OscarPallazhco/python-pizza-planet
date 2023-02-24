@@ -20,6 +20,11 @@ def update(controller, request):
     return __response(entity, error)
 
 
+def get_reports(controller):
+    entity, error = controller.get_report()
+    return __response(entity, error)
+
+
 def __response(entity, error):
     response = entity if not error else {'error': error}
     status_code = 200 if entity else 404 if not error else 400

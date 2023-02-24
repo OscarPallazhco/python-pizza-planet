@@ -35,3 +35,4 @@ Werkzeug==2.0.2
 zipp==3.7.0
 pytest-mock==3.10.0
 coverage==7.2.0
+Faker==17.0.0
