@@ -31,7 +31,17 @@ jobs:
           python3 manage.py db migrate
           python3 manage.py db upgrade
       
-      - name: Run tests
+      - name: run test
         run: |
-          pytest
+          coverage run --source=app -m pytest -v app/test && coverage report -m
+    
+      - name: coverage
+        run: coverage xml
+
+      - name: Get Cover 
+        uses: orgoro/coverage@v3
+        with:
+          coverageFile: coverage.xml
+          token: ${{ secrets.GH_TOKEN }}
+  
   
