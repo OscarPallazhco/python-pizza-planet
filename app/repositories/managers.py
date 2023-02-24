@@ -1,5 +1,6 @@
 from typing import Any, List, Optional, Sequence
 
+from sqlalchemy import func
 from sqlalchemy.sql import text, column
 
 from .models import Ingredient, Order, OrderDetail, Size, Beverage, OrderBeverage, db
@@ -82,6 +83,58 @@ class BeverageManager(BaseManager):
     @classmethod
     def get_by_id_list(cls, ids: Sequence):
         return cls.session.query(cls.model).filter(cls.model._id.in_(set(ids))).all() or []
+
+
+class ReportManager(BaseManager):
+    model: None
+    serializer: None
+
+    @classmethod
+    def get_report(cls):
+        ingredient = cls.most_request_ingredient()
+        month = cls.month_with_more_revenue()
+        best_three_customers = cls.best_customers(3)
+        result = {
+            "most_request_ingredient": ingredient,
+            "month_with_more_revenue": month,
+            "top_3_customers": best_three_customers,
+        }
+        return result
+    
+    @classmethod
+    def most_request_ingredient(cls):
+        id = cls.session.query(OrderDetail.ingredient_id)\
+            .group_by(OrderDetail.ingredient_id)\
+            .order_by(func.count(OrderDetail.ingredient_id)\
+            .desc()).limit(1).scalar()
+        ingredient = Ingredient.query.get(id)
+        
+        return IngredientSerializer().dump(ingredient)
+    
+
+    @classmethod
+    def month_with_more_revenue(cls):
+        v1 = func.strftime('%m-%Y', Order.date).label('month')
+        v2 = func.sum(Order.total_price).label('revenue')
+        result = cls.session.query(v1, v2)\
+            .group_by('month')\
+            .order_by(text('revenue DESC'))\
+            .first()
+        
+        return {"month": result[0], "revenue": round(result[1], 2)}
+    
+
+    @classmethod
+    def best_customers(cls, quantity):
+        v1 = Order.client_name.label('client_name')
+        v2 = func.sum(Order.total_price).label('total_spent')
+        query_result = cls.session.query(v1, v2)\
+            .group_by('client_name')\
+            .order_by(text('total_spent DESC'))\
+            .limit(quantity).all()
+        result = [{"client_name": cust[0], "total_spent": cust[1]} for cust in query_result]
+        
+        return result
 
 
 class IndexManager(BaseManager):
